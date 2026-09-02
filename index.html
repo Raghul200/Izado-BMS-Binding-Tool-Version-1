@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Izado Solutions — XBK Binding Toolkit</title>
+
+<!-- Libraries loaded from public CDNs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+
+<style>
+  :root{
+    --navy:#0f2544;
+    --navy-2:#173served, 16324f;
+    --navy-2:#16324f;
+    --amber:#c9922e;
+    --amber-dark:#a97a20;
+    --amber-soft:rgba(201,146,46,.12);
+    --amber-line:rgba(201,146,46,.4);
+    --bg:#f2f4f8;
+    --panel:#ffffff;
+    --line:#dfe4ec;
+    --line-soft:#eceff4;
+    --text:#182233;
+    --text-dim:#5b6b82;
+    --text-faint:#96a1b4;
+    --green:#1f8a4c;
+    --green-soft:rgba(31,138,76,.10);
+    --green-line:rgba(31,138,76,.35);
+    --yellow:#a5720a;
+    --yellow-soft:rgba(201,146,46,.14);
+    --yellow-line:rgba(201,146,46,.4);
+    --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+    --sans:Arial,"Segoe UI",Helvetica,sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:1360px; margin:0 auto; padding:0 24px 70px; }
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);
+    color:#eef2f8; margin-bottom:28px;
+  }
+  .masthead-inner{
+    max-width:1360px; margin:0 auto; padding:26px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    width:44px; height:44px; border-radius:8px; flex-shrink:0;
+    background:var(--amber); color:var(--navy);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:17px; letter-spacing:0.5px;
+  }
+  .brand-name{ font-size:18px; font-weight:700; letter-spacing:0.2px; color:#fff; }
+  .brand-sub{ font-size:12px; color:#b9c4d6; margin-top:2px; letter-spacing:0.3px; }
+  .masthead-title{ text-align:right; }
+  .masthead-title h1{ margin:0; font-size:19px; font-weight:600; color:#fff; }
+  .masthead-title p{ margin:4px 0 0; font-size:12.5px; color:#aebbcf; max-width:420px; }
+
+  /* ---------- step scaffolding ---------- */
+  .step{ position:relative; padding-left:52px; margin-bottom:34px; }
+  .step:before{
+    content:""; position:absolute; left:19px; top:44px; bottom:-34px; width:1px;
+    background:var(--line);
+  }
+  .step:last-child:before{ display:none; }
+  .step-num{
+    position:absolute; left:0; top:0; width:38px; height:38px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--navy); color:var(--navy);
+    font-family:var(--mono); font-weight:700; font-size:14px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step-head{ margin-bottom:12px; }
+  .step-head h2{ margin:0 0 3px; font-size:16.5px; font-weight:700; color:var(--navy); }
+  .step-head p{ margin:0; font-size:13px; color:var(--text-dim); }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; box-shadow:0 1px 3px rgba(15,37,68,.04);
+  }
+  .panel + .panel{ margin-top:14px; }
+
+  /* ---------- buttons ---------- */
+  .btn{
+    appearance:none; border:1px solid var(--navy); background:var(--navy); color:#fff;
+    padding:10px 16px; border-radius:6px; font-size:13.5px; font-weight:600; cursor:pointer;
+    font-family:var(--sans); transition:background .15s,border-color .15s,color .15s,opacity .15s;
+  }
+  .btn:hover{ background:var(--navy-2); }
+  .btn.amber{ background:var(--amber); border-color:var(--amber); color:#241a06; }
+  .btn.amber:hover{ background:var(--amber-dark); border-color:var(--amber-dark); }
+  .btn.ghost{ background:transparent; border-color:var(--line); color:var(--text-dim); }
+  .btn.ghost:hover{ background:var(--line-soft); color:var(--text); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn:disabled:hover{ background:var(--navy); }
+  .btn.amber:disabled:hover{ background:var(--amber); }
+
+  input[type=file]{
+    padding:9px; border:1px solid var(--line); border-radius:6px; background:#fff; font-size:13px;
+  }
+
+  /* ---------- extractor (step 1) ---------- */
+  .upload-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .hint{ font-size:12px; color:var(--text-faint); margin-top:10px; }
+
+  .status{
+    margin-top:14px; padding:10px 13px; border-radius:7px; background:var(--line-soft);
+    font-size:13px; display:none;
+  }
+  .status.error{ background:#fbeaea; color:#a12222; display:block; }
+  .status.ok{ background:var(--green-soft); color:var(--green); display:block; }
+  .status.info{ background:var(--amber-soft); color:var(--amber-dark); display:block; }
+
+  .stats{ display:grid; grid-template-columns:repeat(3,minmax(140px,1fr)); gap:12px; margin-top:16px; }
+  .stat{ border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .stat .label{ color:var(--text-faint); font-size:12px; text-transform:uppercase; letter-spacing:.4px; }
+  .stat .value{ font-size:22px; font-weight:700; margin-top:4px; font-family:var(--mono); color:var(--navy); }
+
+  .toolbar1{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:16px 0 12px; }
+  #search1{ flex:1; min-width:240px; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font-size:13.5px; }
+
+  .table-wrap{ overflow:auto; max-height:60vh; border:1px solid var(--line); border-radius:8px; }
+  table{ width:100%; border-collapse:collapse; min-width:1050px; font-size:12.5px; }
+  th{ position:sticky; top:0; background:var(--navy); color:#fff; padding:10px 10px; text-align:left; white-space:nowrap; z-index:1; font-weight:600; }
+  td{ padding:8px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top; white-space:nowrap; font-family:var(--mono); color:var(--text-dim); }
+  tr:nth-child(even) td{ background:#fafbfd; }
+  .empty{ text-align:center; padding:40px; color:var(--text-faint); font-family:var(--sans); }
+
+  .handoff{
+    margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  }
+  .handoff p{ margin:0; font-size:12.5px; color:var(--text-dim); max-width:480px; }
+
+  /* ---------- verifier (step 2) ---------- */
+  .drop{
+    border:1px dashed var(--line); border-radius:8px; padding:26px 20px;
+    text-align:center; cursor:pointer; transition:border-color .15s,background .15s; background:var(--line-soft);
+  }
+  .drop.drag{ border-color:var(--amber); background:var(--amber-soft); }
+  .drop-title{ font-size:14px; color:var(--text); font-weight:600; }
+  .drop-sub{ font-size:12px; color:var(--text-faint); margin-top:5px; }
+  input#fileInput2{ display:none; }
+
+  .filerow{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:11px 14px; background:var(--line-soft); border:1px solid var(--line);
+    border-radius:7px; margin-top:14px; font-size:13px;
+  }
+  .filerow .name{ color:var(--text); font-family:var(--mono); font-size:12.5px; }
+  .filerow .meta{ color:var(--text-faint); font-size:12px; margin-top:2px; }
+
+  .toprow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+
+  details.logic{ margin-top:14px; border-top:1px solid var(--line-soft); padding-top:12px; }
+  details.logic summary{ cursor:pointer; font-size:12.5px; color:var(--text-dim); list-style:none; display:flex; align-items:center; gap:6px; }
+  details.logic summary::-webkit-details-marker{ display:none; }
+  details.logic summary:before{ content:"›"; display:inline-block; transition:transform .15s; font-size:15px; color:var(--amber); }
+  details.logic[open] summary:before{ transform:rotate(90deg); }
+  .logic-body{ font-size:12.5px; color:var(--text-faint); line-height:1.7; padding:10px 2px 2px 18px; }
+  .logic-body code{ background:var(--line-soft); padding:1px 5px; border-radius:3px; color:var(--text-dim); font-family:var(--mono); }
+
+  .summary2{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 0; }
+  .card2{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .card2 .num{ font-size:23px; font-weight:700; font-family:var(--mono); }
+  .card2 .lbl{ font-size:11.5px; color:var(--text-faint); margin-top:3px; text-transform:uppercase; letter-spacing:.4px; }
+  .card2.total .num{ color:var(--navy); }
+  .card2.ok .num{ color:var(--green); }
+  .card2.check .num{ color:var(--yellow); }
+  .card2.rate .num{ color:var(--navy); }
+
+  .toolbar2{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px; flex-wrap:wrap; }
+  .filters{ display:flex; gap:8px; }
+  .chip{ padding:7px 13px; border-radius:20px; border:1px solid var(--line); background:transparent; color:var(--text-dim); font-size:12.5px; cursor:pointer; font-family:var(--sans); }
+  .chip.active{ background:var(--line-soft); border-color:var(--navy); color:var(--navy); }
+  .search2{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-size:13px; font-family:var(--sans); width:260px; }
+  .search2:focus{ outline:none; border-color:var(--amber); }
+
+  .tablewrap2{ background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .scroller{ overflow-x:auto; max-height:600px; overflow-y:auto; }
+  table.t2{ border-collapse:collapse; width:100%; font-size:12.5px; min-width:0; }
+  table.t2 thead th{ position:sticky; top:0; background:#eef1f6; color:var(--text-dim); text-align:left; padding:10px 12px; font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--line); white-space:nowrap; z-index:2; }
+  table.t2 tbody td{ padding:9px 12px; border-bottom:1px solid var(--line-soft); font-family:var(--mono); color:var(--text-dim); vertical-align:top; max-width:340px; overflow-wrap:anywhere; white-space:normal; }
+  table.t2 tbody tr:hover td{ background:var(--line-soft); }
+  td.idx{ color:var(--text-faint); font-family:var(--sans); }
+  td.status2{ font-family:var(--sans); }
+  .pill{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; letter-spacing:.2px; white-space:nowrap; }
+  .pill.green{ background:var(--green-soft); color:var(--green); border:1px solid var(--green-line); }
+  .pill.yellow{ background:var(--yellow-soft); color:var(--yellow); border:1px solid var(--yellow-line); }
+  .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  td.reason{ color:var(--text-faint); font-size:11.5px; }
+  tr.row-yellow td:first-child{ box-shadow:inset 3px 0 0 var(--amber); }
+  tr.row-green td:first-child{ box-shadow:inset 3px 0 0 var(--green); }
+
+  footer.note{ margin-top:22px; text-align:center; color:var(--text-faint); font-size:11.5px; }
+  .small{ font-size:12px; color:var(--text-faint); margin-top:8px; }
+  .hidden{ display:none !important; }
+
+  @media(max-width:760px){
+    .stats{ grid-template-columns:1fr; }
+    .summary2{ grid-template-columns:repeat(2,1fr); }
+    .masthead-title{ text-align:left; }
+    .step{ padding-left:0; }
+    .step:before{ display:none; }
+    .step-num{ position:static; margin-bottom:10px; }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <div class="brand-mark">IZ</div>
+      <div>
+        <div class="brand-name">Izado Solutions</div>
+        <div class="brand-sub">EcoXpert Partner · Building Management Systems</div>
+      </div>
+    </div>
+    <div class="masthead-title">
+      <h1>XBK Binding Toolkit</h1>
+      <p>Extract EBO BindingEntry records from an .xbk export, then cross-check subject↔target point-name pairs — all in your browser.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ================= STEP 1 — EXTRACTOR ================= -->
+  <div class="step">
+    <div class="step-num">01</div>
+    <div class="step-head">
+      <h2>Extract bindings from an .xbk file</h2>
+      <p>Reads the export's configuration database and lists every BindingEntry record.</p>
+    </div>
+
+    <div class="panel">
+      <div class="upload-row">
+        <input id="xbkFile" type="file" accept=".xbk,application/zip">
+        <button id="analyzeBtn" class="btn">Extract Bindings</button>
+        <button id="excelBtn" class="btn ghost" disabled>Download Excel</button>
+      </div>
+      <div id="status1" class="status"></div>
+      <div class="hint">The .xbk file is processed locally in your browser. Nothing is uploaded to a server.</div>
+    </div>
+
+    <div id="statsCard1" class="panel" style="display:none;">
+      <div class="stats">
+        <div class="stat">
+          <div class="label">XBK File</div>
+          <div id="fileName1" class="value" style="font-size:15px;word-break:break-all;"></div>
+        </div>
+        <div class="stat">
+          <div class="label">Bindings</div>
+          <div id="count1" class="value">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">Displayed</div>
+          <div id="displayed1" class="value">0</div>
+        </div>
+      </div>
+
+      <div class="handoff">
+        <p>Send the extracted list straight into the verifier below — no need to download and re-upload.</p>
+        <button id="sendToVerifyBtn" class="btn amber" disabled>Verify these bindings ↓</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="toolbar1">
+        <input id="search1" type="text" placeholder="Search subject, property, target, transfer rate..." disabled>
+        <button id="clearBtn1" class="btn ghost" disabled>Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Subject (Reader)</th>
+              <th>Property</th>
+              <th>Target (Sender)</th>
+              <th>Property</th>
+              <th>Transfer Rate</th>
+              <th>Delta Filter</th>
+              <th>Retransmit</th>
+            </tr>
+          </thead>
+          <tbody id="tbody1">
+            <tr><td colspan="8" class="empty">Upload an .xbk file to extract bindings.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STEP 2 — VERIFIER ================= -->
+  <div class="step">
+    <div class="step-num">02</div>
+    <div class="step-head">
+      <h2>Verify subject ↔ target point-name matches</h2>
+      <p>Cross-checks each binding's Subject and Target tags and flags rows that need a manual look.</p>
+    </div>
+
+    <div class="panel">
+      <div class="drop" id="drop2">
+        <div class="drop-title">Drop a binding-export .xlsx here, or click to browse</div>
+        <div class="drop-sub">Same header layout every time — Subject (Reader) · Property · Target (Sender) · Property · Transfer Rate · Delta Filter · Retransmit</div>
+        <input type="file" id="fileInput2" accept=".xlsx,.xls">
+      </div>
+      <div class="filerow hidden" id="fileRow2">
+        <div>
+          <div class="name" id="fileName2">—</div>
+          <div class="meta" id="fileMeta2">—</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn ghost" id="clearBtn2">Clear</button>
+          <button class="btn amber" id="runBtn">Run check</button>
+        </div>
+      </div>
+
+      <details class="logic">
+        <summary>How the match is determined</summary>
+        <div class="logic-body">
+          For every row, the tool builds a small set of identifying tags from the Subject side (last path segment of the Subject, plus the Property tag when it's written as <code>PointName.Value</code>) and from the Target side (last path segment of the Target, plus the Target Property when it isn't a generic name like <code>Value</code>/<code>Status</code>).<br>
+          A row passes <strong>(match)</strong> if any Subject tag and any Target tag are equal, or one contains the other — e.g. <code>EU045041_PDT_03_Log</code> and <code>EU045041_PDT_03</code> share <code>EU045041_PDT_03</code>. If no tag pair lines up, the row is flagged <strong>(needs review)</strong> for manual review. Generic navigation/link properties and shared function-block references (e.g. a common <code>Trend Enable</code> or <code>PID_Fct</code> source) will often flag for review even when correct — that's expected, just glance and confirm.
+        </div>
+      </details>
+
+      <div class="toprow hidden" id="afterRow2">
+        <button class="btn amber" id="downloadBtn2">Download checked workbook (.xlsx)</button>
+        <button class="btn ghost" id="downloadCsvBtn2">Download as CSV</button>
+      </div>
+    </div>
+
+    <div id="results2" class="hidden">
+      <div class="summary2">
+        <div class="card2 total"><div class="num" id="statTotal">0</div><div class="lbl">Total bindings</div></div>
+        <div class="card2 ok"><div class="num" id="statGreen">0</div><div class="lbl">Confirmed match</div></div>
+        <div class="card2 check"><div class="num" id="statYellow">0</div><div class="lbl">Needs review</div></div>
+        <div class="card2 rate"><div class="num" id="statRate">0%</div><div class="lbl">Match rate</div></div>
+      </div>
+
+      <div class="toolbar2">
+        <div class="filters">
+          <button class="chip active" data-filter="all">All rows</button>
+          <button class="chip" data-filter="green">Matched</button>
+          <button class="chip" data-filter="yellow">Needs review</button>
+        </div>
+        <input type="text" class="search2" id="searchBox2" placeholder="Filter by path, tag, program…">
+      </div>
+
+      <div class="tablewrap2">
+        <div class="scroller">
+          <table class="t2" id="resultTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Subject (Reader)</th>
+                <th>Property</th>
+                <th>Target (Sender)</th>
+                <th>Property</th>
+                <th>Binding Check</th>
+                <th>Match basis</th>
+              </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <footer class="note">Tags compared: last path segment + specific property name on each side · substring/equality match · review flags are a starting point, not a verdict</footer>
+    </div>
+  </div>
+
+  <footer class="note">Izado Solutions — Building Management Systems · Processed entirely in your browser, no files leave your device.</footer>
+</div>
+
+<script>
+/* =========================================================
+   STEP 1 — XBK BINDING EXTRACTOR
+   (logic preserved from the original single-page extractor)
+   ========================================================= */
+(function(){
+  "use strict";
+
+  let allRows = [];
+  let filteredRows = [];
+  let lastWorkbook = null; // {wb, baseName} kept for handoff to Step 2
+
+  const EXCLUDED_PROPERTIES = new Set([
+      "Task", "Category", "SynchSource", "Workspaces", "LogPoint",
+      "InitialAddress", "ContentType", "GroupMembership", "DefaultDomain"
+  ]);
+
+  const QUERY = `
+SELECT
+    b.Id,
+    sp.Path AS subject,
+    pi.Name AS property,
+    b.TargetProperty AS target_property,
+    tp.Path AS target,
+    b.TransferRate AS transfer_rate,
+    b.DeltaFilter AS delta_filter,
+    b.Retransmit AS retransmit
+FROM BindingEntry b
+JOIN ObjectInstancePath sp ON sp.Id = b.SubjectId
+JOIN PropertyInstance pi ON pi.Id = b.SubjectPropertyId
+JOIN ObjectInstancePath tp ON tp.Id = b.TargetId
+ORDER BY b.Id
+`;
+
+  const $ = id => document.getElementById(id);
+
+  function setStatus(message, type) {
+      const el = $("status1");
+      el.textContent = message;
+      el.className = "status " + (type || "");
+      el.style.display = "block";
+  }
+
+  function escapeHtml(value) {
+      return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+  }
+
+  function displayValue(v) {
+      return v === null || v === undefined ? "" : String(v);
+  }
+
+  async function getConfigurationDatabase(file) {
+      const zip = await JSZip.loadAsync(file);
+      const entry = zip.file("Configuration/configuration.db");
+      if (!entry) {
+          throw new Error("Configuration/configuration.db was not found in this XBK file.");
+      }
+      return await entry.async("uint8array");
+  }
+
+  async function extractBindings(file) {
+      const dbBytes = await getConfigurationDatabase(file);
+
+      const SQL = await initSqlJs({
+          locateFile: filename =>
+              "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + filename
+      });
+
+      const db = new SQL.Database(dbBytes);
+
+      try {
+          let result;
+          try {
+              result = db.exec(QUERY);
+          } catch (err) {
+              throw new Error(
+                  "Could not read the expected EBO binding tables. " +
+                  "The XBK structure may be different from this version. " + err.message
+              );
+          }
+
+          if (!result.length) return [];
+
+          const columns = result[0].columns;
+          const values = result[0].values;
+
+          const index = {};
+          columns.forEach((c, i) => index[c] = i);
+
+          const rows = [];
+
+          for (const row of values) {
+              const property = row[index.property];
+              if (EXCLUDED_PROPERTIES.has(property)) continue;
+
+              // Match the reference SBO XBK Analyzer report behavior:
+              // empty target property remains empty; DB retransmit 0 displays as -1.
+              const retransmitRaw = row[index.retransmit];
+
+              rows.push([
+                  displayValue(row[index.subject]),
+                  displayValue(property),
+                  displayValue(row[index.target]),
+                  displayValue(row[index.target_property]),
+                  row[index.transfer_rate] == null ? "" : row[index.transfer_rate],
+                  row[index.delta_filter] == null ? "" : row[index.delta_filter],
+                  retransmitRaw === 0 ? -1 :
+                      (retransmitRaw == null ? "" : retransmitRaw)
+              ]);
+          }
+
+          return rows;
+      } finally {
+          db.close();
+      }
+  }
+
+  function renderTable(rows) {
+      const tbody = $("tbody1");
+
+      if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty">No matching bindings found.</td></tr>';
+          $("displayed1").textContent = "0";
+          return;
+      }
+
+      // Limit DOM rows for performance; Excel export still contains all rows.
+      const visible = rows.slice(0, 2000);
+
+      tbody.innerHTML = visible.map((r, i) => `
+          <tr>
+              <td>${i + 1}</td>
+              <td>${escapeHtml(r[0])}</td>
+              <td>${escapeHtml(r[1])}</td>
+              <td>${escapeHtml(r[2])}</td>
+              <td>${escapeHtml(r[3])}</td>
+              <td>${escapeHtml(r[4])}</td>
+              <td>${escapeHtml(r[5])}</td>
+              <td>${escapeHtml(r[6])}</td>
+          </tr>
+      `).join("");
+
+      $("displayed1").textContent =
+          visible.length + (rows.length > 2000 ? " / " + rows.length : "");
+  }
+
+  function applySearch() {
+      const q = $("search1").value.trim().toLowerCase();
+
+      if (!q) {
+          filteredRows = allRows;
+      } else {
+          filteredRows = allRows.filter(row =>
+              row.some(cell => String(cell).toLowerCase().includes(q))
+          );
+      }
+      renderTable(filteredRows);
+  }
+
+  function buildWorkbook() {
+      const headers = [
+          "Subject (Reader)", "Property", "Target (Sender)", "Property",
+          "Transfer Rate", "Delta Filter", "Retransmit"
+      ];
+      const data = [headers, ...allRows];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+
+      ws["!cols"] = [
+          {wch: 78}, {wch: 24}, {wch: 62}, {wch: 24}, {wch: 16}, {wch: 16}, {wch: 14}
+      ];
+      ws["!freeze"] = {xSplit: 0, ySplit: 1};
+      ws["!autofilter"] = {ref: `A1:G${data.length}`};
+
+      for (let c = 0; c < headers.length; c++) {
+          const cell = ws[XLSX.utils.encode_cell({r:0, c})];
+          if (cell) {
+              cell.s = {
+                  font: {bold: true, color: {rgb: "FFFFFF"}},
+                  fill: {fgColor: {rgb: "1F4E78"}},
+                  alignment: {horizontal: "center", vertical: "center"}
+              };
+          }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Binding Report");
+
+      const original = $("xbkFile").files[0];
+      const baseName = original ? original.name.replace(/\.xbk$/i, "") : "XBK Binding Report";
+
+      return { wb, baseName };
+  }
+
+  function downloadExcel() {
+      if (!allRows.length) return;
+      const { wb, baseName } = buildWorkbook();
+      XLSX.writeFile(wb, baseName + " - Binding Report.xlsx");
+  }
+
+  $("analyzeBtn").addEventListener("click", async () => {
+      const file = $("xbkFile").files[0];
+
+      if (!file) { setStatus("Please select an .xbk file.", "error"); return; }
+      if (!file.name.toLowerCase().endsWith(".xbk")) { setStatus("Please select an .xbk file.", "error"); return; }
+
+      $("analyzeBtn").disabled = true;
+      $("excelBtn").disabled = true;
+      $("search1").disabled = true;
+      $("clearBtn1").disabled = true;
+      $("sendToVerifyBtn").disabled = true;
+
+      try {
+          setStatus("Reading XBK and extracting configuration database...", "");
+
+          allRows = await extractBindings(file);
+          filteredRows = allRows;
+          lastWorkbook = null;
+
+          $("fileName1").textContent = file.name;
+          $("count1").textContent = allRows.length.toLocaleString();
+          $("statsCard1").style.display = "block";
+
+          $("search1").disabled = false;
+          $("clearBtn1").disabled = false;
+          $("excelBtn").disabled = allRows.length === 0;
+          $("sendToVerifyBtn").disabled = allRows.length === 0;
+
+          renderTable(allRows);
+
+          setStatus(
+              `Extraction completed successfully. ${allRows.length.toLocaleString()} bindings found.`,
+              "ok"
+          );
+      } catch (err) {
+          allRows = [];
+          filteredRows = [];
+          $("statsCard1").style.display = "none";
+          $("tbody1").innerHTML = '<tr><td colspan="8" class="empty">Unable to extract bindings.</td></tr>';
+          setStatus(err.message || String(err), "error");
+      } finally {
+          $("analyzeBtn").disabled = false;
+      }
+  });
+
+  $("excelBtn").addEventListener("click", downloadExcel);
+  $("search1").addEventListener("input", applySearch);
+  $("clearBtn1").addEventListener("click", () => { $("search1").value = ""; applySearch(); });
+
+  // ---- handoff to Step 2 (verifier), without removing the manual download/upload path ----
+  $("sendToVerifyBtn").addEventListener("click", async () => {
+      if (!allRows.length) return;
+      try {
+          $("sendToVerifyBtn").disabled = true;
+          $("sendToVerifyBtn").textContent = "Sending…";
+
+          const { wb, baseName } = buildWorkbook();
+          const arrayBuf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+          const fileName = baseName + " - Binding Report.xlsx";
+          const file = new File([arrayBuf], fileName, {
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          });
+
+          if (window.__izadoVerifier && typeof window.__izadoVerifier.loadFile === "function") {
+              window.__izadoVerifier.loadFile(file);
+              document.getElementById("drop2").scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+      } finally {
+          $("sendToVerifyBtn").disabled = false;
+          $("sendToVerifyBtn").textContent = "Verify these bindings ↓";
+      }
+  });
+})();
+
+/* =========================================================
+   STEP 2 — BINDING VERIFIER
+   (logic preserved from the original binding verifier page)
+   ========================================================= */
+(function(){
+  "use strict";
+
+  const GENERIC = new Set(['value','status','link','basicevaluationstate','presentvalue','present value','ok','in','out']);
+
+  function lastSeg(p){
+      if(!p) return '';
+      let s = String(p).trim().replace(/\/+$/,'');
+      let parts = s.split('/');
+      return parts[parts.length-1].trim();
+  }
+  function baseTag(p){
+      if(!p) return '';
+      let s = String(p).trim();
+      let idx = s.lastIndexOf('.');
+      if(idx > 0) return s.substring(0, idx).trim();
+      return s;
+  }
+  function isGeneric(s){ return GENERIC.has(String(s).trim().toLowerCase()); }
+
+  function candidates(pathVal, propVal){
+      let out = [];
+      let ls = lastSeg(pathVal);
+      if(ls) out.push(ls);
+      if(propVal){
+          let tag = baseTag(propVal);
+          if(tag && tag.length >= 3 && !isGeneric(tag)) out.push(tag);
+      }
+      return [...new Set(out)];
+  }
+
+  function tagsMatch(a, b){
+      if(!a || !b) return false;
+      let x = a.toLowerCase().replace(/\s+/g,'');
+      let y = b.toLowerCase().replace(/\s+/g,'');
+      if(x === y) return true;
+      if(Math.min(x.length, y.length) < 4) return false;
+      return x.includes(y) || y.includes(x);
+  }
+
+  function checkRow(subject, propA, target, propB){
+      const L = candidates(subject, propA);
+      const R = candidates(target, propB);
+      for(const l of L){
+          for(const r of R){
+              if(tagsMatch(l, r)) return { ok:true, basis: `"${l}" ↔ "${r}"` };
+          }
+      }
+      const lStr = L.length ? L.join(' / ') : '—';
+      const rStr = R.length ? R.join(' / ') : '—';
+      return { ok:false, basis: `${lStr}  vs  ${rStr}` };
+  }
+
+  // ---- state ----
+  let workbookFile = null;
+  let headerInfo = null;
+  let rawRows = [];
+  let results = [];
+  let currentFilter = 'all';
+
+  const dropEl = document.getElementById('drop2');
+  const fileInput = document.getElementById('fileInput2');
+  const fileRow = document.getElementById('fileRow2');
+  const fileNameEl = document.getElementById('fileName2');
+  const fileMetaEl = document.getElementById('fileMeta2');
+  const runBtn = document.getElementById('runBtn');
+  const clearBtn = document.getElementById('clearBtn2');
+  const afterRow = document.getElementById('afterRow2');
+  const resultsSection = document.getElementById('results2');
+  const resultBody = document.getElementById('resultBody');
+  const downloadBtn = document.getElementById('downloadBtn2');
+  const downloadCsvBtn = document.getElementById('downloadCsvBtn2');
+  const searchBox = document.getElementById('searchBox2');
+
+  dropEl.addEventListener('click', () => fileInput.click());
+  ['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, e => {
+      e.preventDefault(); dropEl.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => {
+      e.preventDefault(); dropEl.classList.remove('drag');
+  }));
+  dropEl.addEventListener('drop', e => {
+      const f = e.dataTransfer.files[0];
+      if(f) handleFile(f);
+  });
+  fileInput.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if(f) handleFile(f);
+  });
+
+  function handleFile(f){
+      workbookFile = f;
+      fileNameEl.textContent = f.name;
+      fileMetaEl.textContent = (f.size/1024).toFixed(1) + ' KB';
+      fileRow.classList.remove('hidden');
+      resultsSection.classList.add('hidden');
+      afterRow.classList.add('hidden');
+  }
+
+  clearBtn.addEventListener('click', () => {
+      workbookFile = null; fileInput.value = '';
+      fileRow.classList.add('hidden');
+      resultsSection.classList.add('hidden');
+      afterRow.classList.add('hidden');
+  });
+
+  runBtn.addEventListener('click', () => runCheck());
+
+  async function runCheck(){
+      if(!workbookFile) return;
+      runBtn.disabled = true; runBtn.textContent = 'Processing…';
+      try{
+          await processWorkbook(workbookFile);
+          resultsSection.classList.remove('hidden');
+          afterRow.classList.remove('hidden');
+      }catch(err){
+          alert('Could not read this file: ' + err.message);
+          console.error(err);
+      }finally{
+          runBtn.disabled = false; runBtn.textContent = 'Run check';
+      }
+  }
+
+  async function processWorkbook(file){
+      const buf = await file.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      const ws = wb.worksheets[0];
+
+      // find header row: first row within first 5 that has a cell containing "subject"
+      let headerRowIdx = 1;
+      outer:
+      for(let r = 1; r <= Math.min(5, ws.rowCount); r++){
+          const row = ws.getRow(r);
+          for(let c = 1; c <= Math.min(10, row.cellCount || 10); c++){
+              const v = row.getCell(c).value;
+              if(v && String(v).toLowerCase().includes('subject')){
+                  headerRowIdx = r;
+                  break outer;
+              }
+          }
+      }
+      const headerRow = ws.getRow(headerRowIdx);
+      let colSubject = 1;
+      for(let c = 1; c <= 12; c++){
+          const v = headerRow.getCell(c).value;
+          if(v && String(v).toLowerCase().includes('subject')){ colSubject = c; break; }
+      }
+      const colPropA = colSubject + 1;
+      const colTarget = colSubject + 2;
+      const colPropB = colSubject + 3;
+      const colE = colSubject + 4;
+      const colF = colSubject + 5;
+      const colG = colSubject + 6;
+
+      rawRows = [];
+      ws.eachRow({ includeEmpty:false }, (row, rowNumber) => {
+          if(rowNumber <= headerRowIdx) return;
+          const subject = cellText(row.getCell(colSubject));
+          if(!subject) return;
+          rawRows.push({
+              rowNum: rowNumber,
+              subject,
+              propA: cellText(row.getCell(colPropA)),
+              target: cellText(row.getCell(colTarget)),
+              propB: cellText(row.getCell(colPropB)),
+              e: cellText(row.getCell(colE)),
+              f: cellText(row.getCell(colF)),
+              g: cellText(row.getCell(colG)),
+          });
+      });
+
+      headerInfo = { sheetName: ws.name, headerRowIdx, colSubject, colPropA, colTarget, colPropB, colE, colF, colG };
+
+      results = rawRows.map(r => {
+          const chk = checkRow(r.subject, r.propA, r.target, r.propB);
+          return Object.assign({}, r, { ok: chk.ok, basis: chk.basis });
+      });
+
+      renderStats();
+      renderTable();
+  }
+
+  function cellText(cell){
+      if(!cell) return '';
+      let v = cell.value;
+      if(v === null || v === undefined) return '';
+      if(typeof v === 'object'){
+          if(v.richText) return v.richText.map(t => t.text).join('');
+          if(v.text) return v.text;
+          if(v.result !== undefined) return String(v.result);
+          return String(v);
+      }
+      return String(v);
+  }
+
+  function renderStats(){
+      const total = results.length;
+      const green = results.filter(r => r.ok).length;
+      const yellow = total - green;
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statGreen').textContent = green;
+      document.getElementById('statYellow').textContent = yellow;
+      document.getElementById('statRate').textContent = total ? Math.round(green/total*100) + '%' : '0%';
+  }
+
+  function renderTable(){
+      const q = searchBox.value.trim().toLowerCase();
+      resultBody.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      let shown = 0;
+      results.forEach((r) => {
+          if(currentFilter === 'green' && !r.ok) return;
+          if(currentFilter === 'yellow' && r.ok) return;
+          if(q){
+              const hay = (r.subject + ' ' + r.propA + ' ' + r.target + ' ' + r.propB).toLowerCase();
+              if(!hay.includes(q)) return;
+          }
+          shown++;
+          const tr = document.createElement('tr');
+          tr.className = r.ok ? 'row-green' : 'row-yellow';
+          tr.innerHTML = `
+              <td class="idx">${r.rowNum}</td>
+              <td>${escapeHtml(r.subject)}</td>
+              <td>${escapeHtml(r.propA)}</td>
+              <td>${escapeHtml(r.target)}</td>
+              <td>${escapeHtml(r.propB)}</td>
+              <td class="status2">${r.ok
+                  ? '<span class="pill green"><span class="dot"></span>Match</span>'
+                  : '<span class="pill yellow"><span class="dot"></span>Review</span>'}</td>
+              <td class="reason">${escapeHtml(r.basis)}</td>
+          `;
+          frag.appendChild(tr);
+      });
+      resultBody.appendChild(frag);
+      if(shown === 0){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="7"><div class="empty">No rows match this filter.</div></td>`;
+          resultBody.appendChild(tr);
+      }
+  }
+
+  function escapeHtml(s){
+      return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+          document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.filter;
+          renderTable();
+      });
+  });
+  searchBox.addEventListener('input', renderTable);
+
+  downloadBtn.addEventListener('click', async () => {
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet(headerInfo.sheetName || 'Bindings');
+
+      const headers = ['Subject (Reader)','Property','Target (Sender)','Property','Transfer Rate','Delta Filter','Retransmit','Binding Check','Match Basis'];
+      const headerRow = ws.addRow(headers);
+      headerRow.eachCell(cell => {
+          cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
+          cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0F2544'} };
+      });
+
+      results.forEach(r => {
+          const row = ws.addRow([r.subject, r.propA, r.target, r.propB, r.e, r.f, r.g, r.ok ? 'Match' : 'Review', r.basis]);
+          const fill = r.ok ? 'FFD9F2E0' : 'FFFBF0DC';
+          const fontColor = r.ok ? 'FF1E6B3E' : 'FF8A6A0A';
+          row.getCell(8).fill = { type:'pattern', pattern:'solid', fgColor:{argb: fill} };
+          row.getCell(8).font = { bold:true, color:{argb: fontColor} };
+          row.getCell(9).font = { italic:true, color:{argb:'FF666666'}, size:10 };
+      });
+
+      ws.columns.forEach((col, idx) => {
+          const widths = [46,26,46,26,12,12,12,14,40];
+          col.width = widths[idx] || 20;
+      });
+      ws.views = [{ state:'frozen', ySplit:1 }];
+
+      const buf = await wb.xlsx.writeBuffer();
+      downloadBlob(new Blob([buf], {type:'application/octet-stream'}), 'binding_check_result.xlsx');
+  });
+
+  downloadCsvBtn.addEventListener('click', () => {
+      const headers = ['Subject (Reader)','Property','Target (Sender)','Property','Transfer Rate','Delta Filter','Retransmit','Binding Check','Match Basis'];
+      const lines = [headers.join(',')];
+      results.forEach(r => {
+          const row = [r.subject, r.propA, r.target, r.propB, r.e, r.f, r.g, r.ok?'Match':'Review', r.basis]
+              .map(v => `"${String(v||'').replace(/"/g,'""')}"`);
+          lines.push(row.join(','));
+      });
+      downloadBlob(new Blob([lines.join('\n')], {type:'text/csv'}), 'binding_check_result.csv');
+  });
+
+  function downloadBlob(blob, filename){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  }
+
+  // Exposed so Step 1 can hand off an in-memory workbook without a manual download/upload round-trip.
+  window.__izadoVerifier = {
+      loadFile: function(file){
+          handleFile(file);
+          runCheck();
+      }
+  };
+})();
+</script>
+</body>
+</html>
