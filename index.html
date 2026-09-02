@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binding Verifier — Niagara Point Binding Cross-Check</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  :root{
+    --bg: #0e1512;
+    --panel: #131c19;
+    --panel-2: #17221e;
+    --line: #24342e;
+    --line-soft: #1c2925;
+    --text: #d9e5df;
+    --text-dim: #8ca79b;
+    --text-faint: #5b746a;
+    --amber: #d99a2b;
+    --amber-soft: rgba(217,154,43,0.12);
+    --green: #4caf6f;
+    --green-soft: rgba(76,175,111,0.14);
+    --green-line: rgba(76,175,111,0.4);
+    --yellow: #d9c93a;
+    --yellow-soft: rgba(217,201,58,0.16);
+    --yellow-line: rgba(217,201,58,0.45);
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, Menlo, monospace;
+    --sans: "IBM Plex Sans", "Inter", -apple-system, "Segoe UI", sans-serif;
+  }
+  @font-face{
+    font-family:"IBM Plex Sans"; src:local("Arial");
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+  }
+  body{ min-height:100vh; }
+
+  .wrap{ max-width:1400px; margin:0 auto; padding:36px 28px 80px; }
+
+  /* header */
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:28px;
+    gap:24px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    width:38px; height:38px; border:1px solid var(--amber); border-radius:3px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    position:relative;
+  }
+  .brand-mark svg{ width:20px; height:20px; }
+  h1{
+    font-size:20px; font-weight:600; letter-spacing:0.2px; margin:0; color:var(--text);
+  }
+  .sub{ color:var(--text-dim); font-size:13px; margin-top:3px; }
+  .tagline{
+    color:var(--text-faint); font-size:12.5px; text-align:right; line-height:1.5; max-width:340px;
+  }
+
+  /* upload panel */
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:22px; margin-bottom:22px;
+  }
+  .drop{
+    border:1px dashed var(--line); border-radius:5px; padding:30px 20px;
+    text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+    background:var(--panel-2);
+  }
+  .drop.drag{ border-color:var(--amber); background:var(--amber-soft); }
+  .drop-icon{ margin-bottom:10px; opacity:0.6; }
+  .drop-title{ font-size:14.5px; color:var(--text); font-weight:500; }
+  .drop-sub{ font-size:12.5px; color:var(--text-faint); margin-top:5px; }
+  input[type=file]{ display:none; }
+
+  .filerow{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:12px 14px; background:var(--panel-2); border:1px solid var(--line-soft);
+    border-radius:5px; margin-top:14px; font-size:13px;
+  }
+  .filerow .name{ color:var(--text); font-family:var(--mono); font-size:12.5px; }
+  .filerow .meta{ color:var(--text-faint); font-size:12px; margin-top:2px; }
+  .btn{
+    appearance:none; border:1px solid var(--amber); background:transparent; color:var(--amber);
+    padding:9px 16px; border-radius:4px; font-size:13px; font-weight:500; cursor:pointer;
+    font-family:var(--sans); transition:background .15s, color .15s;
+  }
+  .btn:hover{ background:var(--amber); color:#14100a; }
+  .btn.solid{ background:var(--amber); color:#14100a; }
+  .btn.solid:hover{ background:#c68a1e; }
+  .btn.ghost{ border-color:var(--line); color:var(--text-dim); }
+  .btn.ghost:hover{ background:var(--panel-2); color:var(--text); }
+  .btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .btn:disabled:hover{ background:transparent; color:var(--amber); }
+
+  .toprow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+
+  /* logic explainer */
+  details.logic{
+    margin-top:16px; border-top:1px solid var(--line-soft); padding-top:14px;
+  }
+  details.logic summary{
+    cursor:pointer; font-size:12.5px; color:var(--text-dim); list-style:none; display:flex; align-items:center; gap:6px;
+  }
+  details.logic summary::-webkit-details-marker{ display:none; }
+  details.logic summary:before{ content:"›"; display:inline-block; transition:transform .15s; font-size:15px; color:var(--amber); }
+  details.logic[open] summary:before{ transform:rotate(90deg); }
+  .logic-body{ font-size:12.5px; color:var(--text-faint); line-height:1.7; padding:12px 2px 2px 18px; }
+  .logic-body code{ background:var(--panel-2); padding:1px 5px; border-radius:3px; color:var(--text-dim); font-family:var(--mono); }
+
+  /* summary cards */
+  .summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px 18px;
+  }
+  .card .num{ font-size:26px; font-weight:600; font-family:var(--mono); }
+  .card .lbl{ font-size:12px; color:var(--text-faint); margin-top:4px; text-transform:uppercase; letter-spacing:0.4px; }
+  .card.total .num{ color:var(--text); }
+  .card.ok .num{ color:var(--green); }
+  .card.check .num{ color:var(--yellow); }
+  .card.rate .num{ color:var(--text); }
+
+  /* toolbar */
+  .toolbar{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    margin-bottom:12px; flex-wrap:wrap;
+  }
+  .filters{ display:flex; gap:8px; }
+  .chip{
+    padding:7px 13px; border-radius:20px; border:1px solid var(--line); background:transparent;
+    color:var(--text-dim); font-size:12.5px; cursor:pointer; font-family:var(--sans);
+  }
+  .chip.active{ background:var(--panel-2); border-color:var(--text-dim); color:var(--text); }
+  .search{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:5px; padding:8px 12px;
+    color:var(--text); font-size:13px; font-family:var(--sans); width:260px;
+  }
+  .search::placeholder{ color:var(--text-faint); }
+  .search:focus{ outline:none; border-color:var(--amber); }
+
+  /* table */
+  .tablewrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden;
+  }
+  .scroller{ overflow-x:auto; max-height:640px; overflow-y:auto; }
+  table{ border-collapse:collapse; width:100%; font-size:12.5px; }
+  thead th{
+    position:sticky; top:0; background:#182420; color:var(--text-dim); text-align:left;
+    padding:10px 12px; font-weight:500; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px;
+    border-bottom:1px solid var(--line); white-space:nowrap; z-index:2;
+  }
+  tbody td{
+    padding:9px 12px; border-bottom:1px solid var(--line-soft); font-family:var(--mono);
+    color:var(--text-dim); vertical-align:top; max-width:340px; overflow-wrap:anywhere;
+  }
+  tbody tr:hover td{ background:#152019; }
+  td.idx{ color:var(--text-faint); font-family:var(--sans); }
+  td.status{ font-family:var(--sans); }
+  .pill{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
+    font-size:11.5px; font-weight:600; letter-spacing:0.2px; white-space:nowrap;
+  }
+  .pill.green{ background:var(--green-soft); color:var(--green); border:1px solid var(--green-line); }
+  .pill.yellow{ background:var(--yellow-soft); color:var(--yellow); border:1px solid var(--yellow-line); }
+  .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  td.reason{ color:var(--text-faint); font-size:11.5px; }
+  tr.row-green td{ border-left:2px solid transparent; }
+  tr.row-yellow td:first-child{ box-shadow: inset 3px 0 0 var(--yellow); }
+  tr.row-green td:first-child{ box-shadow: inset 3px 0 0 var(--green); }
+
+  .empty{
+    padding:60px 20px; text-align:center; color:var(--text-faint); font-size:13.5px;
+  }
+
+  footer{ margin-top:30px; text-align:center; color:var(--text-faint); font-size:11.5px; }
+
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:#2a3a34; border-radius:6px; }
+
+  .hidden{ display:none !important; }
+
+  @media (max-width:760px){
+    .summary{ grid-template-columns:repeat(2,1fr); }
+    .tagline{ display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#d99a2b" stroke-width="1.6"><path d="M4 12h4l2-7 4 14 2-7h4"/></svg>
+      </div>
+      <div>
+        <h1>Binding Verifier</h1>
+        <div class="sub">Subject ↔ Target point-name cross-check for Niagara/EcoStruxure export sheets</div>
+      </div>
+    </div>
+    <div class="tagline">Works on any exported binding list — Extended Trendlogs, Alarms, Graphics, Programs, IO — as long as the header row matches the standard export layout.</div>
+  </header>
+
+  <div class="panel">
+    <div class="drop" id="drop">
+      <div class="drop-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#8ca79b" stroke-width="1.4"><path d="M12 3v12m0-12 4 4m-4-4-4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      </div>
+      <div class="drop-title">Drop a binding-export .xlsx here, or click to browse</div>
+      <div class="drop-sub">Same header layout every time — Subject (Reader) · Property · Target (Sender) · Property · Transfer Rate · Delta Filter · Retransmit</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+    </div>
+    <div class="filerow hidden" id="fileRow">
+      <div>
+        <div class="name" id="fileName">—</div>
+        <div class="meta" id="fileMeta">—</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn ghost" id="clearBtn">Clear</button>
+        <button class="btn solid" id="runBtn">Run check</button>
+      </div>
+    </div>
+
+    <details class="logic">
+      <summary>How the match is determined</summary>
+      <div class="logic-body">
+        For every row, the tool builds a small set of identifying tags from the Subject side (last path segment of the Subject, plus the Property tag when it's written as <code>PointName.Value</code>) and from the Target side (last path segment of the Target, plus the Target Property when it isn't a generic name like <code>Value</code>/<code>Status</code>).<br>
+        A row passes <strong>(green)</strong> if any Subject tag and any Target tag are equal, or one contains the other — e.g. <code>EU045041_PDT_03_Log</code> and <code>EU045041_PDT_03</code> share <code>EU045041_PDT_03</code>. If no tag pair lines up, the row is flagged <strong>(yellow)</strong> for manual review. Generic navigation/link properties and shared function-block references (e.g. a common <code>Trend Enable</code> or <code>PID_Fct</code> source) will often flag yellow even when correct — that's expected, just glance and confirm.
+      </div>
+    </details>
+
+    <div class="toprow hidden" id="afterRow">
+      <button class="btn solid" id="downloadBtn">Download checked workbook (.xlsx)</button>
+      <button class="btn ghost" id="downloadCsvBtn">Download as CSV</button>
+    </div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="summary">
+      <div class="card total"><div class="num" id="statTotal">0</div><div class="lbl">Total bindings</div></div>
+      <div class="card ok"><div class="num" id="statGreen">0</div><div class="lbl">Confirmed match</div></div>
+      <div class="card check"><div class="num" id="statYellow">0</div><div class="lbl">Needs review</div></div>
+      <div class="card rate"><div class="num" id="statRate">0%</div><div class="lbl">Match rate</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <button class="chip active" data-filter="all">All rows</button>
+        <button class="chip" data-filter="green">Matched</button>
+        <button class="chip" data-filter="yellow">Needs review</button>
+      </div>
+      <input type="text" class="search" id="searchBox" placeholder="Filter by path, tag, program…">
+    </div>
+
+    <div class="tablewrap">
+      <div class="scroller">
+        <table id="resultTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Subject (Reader)</th>
+              <th>Property</th>
+              <th>Target (Sender)</th>
+              <th>Property</th>
+              <th>Binding Check</th>
+              <th>Match basis</th>
+            </tr>
+          </thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <footer>Tags compared: last path segment + specific property name on each side · substring/equality match · review flags are a starting point, not a verdict</footer>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const GENERIC = new Set(['value','status','link','basicevaluationstate','presentvalue','present value','ok','in','out']);
+
+  function lastSeg(p){
+    if(!p) return '';
+    let s = String(p).trim().replace(/\/+$/,'');
+    let parts = s.split('/');
+    return parts[parts.length-1].trim();
+  }
+  function baseTag(p){
+    if(!p) return '';
+    let s = String(p).trim();
+    let idx = s.lastIndexOf('.');
+    if(idx > 0) return s.substring(0, idx).trim();
+    return s;
+  }
+  function isGeneric(s){ return GENERIC.has(String(s).trim().toLowerCase()); }
+
+  function candidates(pathVal, propVal){
+    let out = [];
+    let ls = lastSeg(pathVal);
+    if(ls) out.push(ls);
+    if(propVal){
+      let tag = baseTag(propVal);
+      if(tag && tag.length >= 3 && !isGeneric(tag)) out.push(tag);
+    }
+    return [...new Set(out)];
+  }
+
+  function tagsMatch(a, b){
+    if(!a || !b) return false;
+    let x = a.toLowerCase().replace(/\s+/g,'');
+    let y = b.toLowerCase().replace(/\s+/g,'');
+    if(x === y) return true;
+    if(Math.min(x.length, y.length) < 4) return false;
+    return x.includes(y) || y.includes(x);
+  }
+
+  function checkRow(subject, propA, target, propB){
+    const L = candidates(subject, propA);
+    const R = candidates(target, propB);
+    for(const l of L){
+      for(const r of R){
+        if(tagsMatch(l, r)) return { ok:true, basis: `"${l}" ↔ "${r}"` };
+      }
+    }
+    const lStr = L.length ? L.join(' / ') : '—';
+    const rStr = R.length ? R.join(' / ') : '—';
+    return { ok:false, basis: `${lStr}  vs  ${rStr}` };
+  }
+
+  // ---- state ----
+  let workbookFile = null;
+  let headerInfo = null; // {sheetName, headerRowIdx, colSubject, colPropA, colTarget, colPropB, colE, colF, colG}
+  let rawRows = [];      // array of {subject, propA, target, propB, extra:[e,f,g], rowNum}
+  let results = [];      // array of {..., ok, basis}
+  let currentFilter = 'all';
+
+  const dropEl = document.getElementById('drop');
+  const fileInput = document.getElementById('fileInput');
+  const fileRow = document.getElementById('fileRow');
+  const fileName = document.getElementById('fileName');
+  const fileMeta = document.getElementById('fileMeta');
+  const runBtn = document.getElementById('runBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const afterRow = document.getElementById('afterRow');
+  const resultsSection = document.getElementById('results');
+  const resultBody = document.getElementById('resultBody');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+  const searchBox = document.getElementById('searchBox');
+
+  dropEl.addEventListener('click', () => fileInput.click());
+  ['dragenter','dragover'].forEach(ev => dropEl.addEventListener(ev, e => {
+    e.preventDefault(); dropEl.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => {
+    e.preventDefault(); dropEl.classList.remove('drag');
+  }));
+  dropEl.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if(f) handleFile(f);
+  });
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if(f) handleFile(f);
+  });
+
+  function handleFile(f){
+    workbookFile = f;
+    fileName.textContent = f.name;
+    fileMeta.textContent = (f.size/1024).toFixed(1) + ' KB';
+    fileRow.classList.remove('hidden');
+    resultsSection.classList.add('hidden');
+    afterRow.classList.add('hidden');
+  }
+
+  clearBtn.addEventListener('click', () => {
+    workbookFile = null; fileInput.value = '';
+    fileRow.classList.add('hidden');
+    resultsSection.classList.add('hidden');
+    afterRow.classList.add('hidden');
+  });
+
+  runBtn.addEventListener('click', async () => {
+    if(!workbookFile) return;
+    runBtn.disabled = true; runBtn.textContent = 'Processing…';
+    try{
+      await processWorkbook(workbookFile);
+      resultsSection.classList.remove('hidden');
+      afterRow.classList.remove('hidden');
+    }catch(err){
+      alert('Could not read this file: ' + err.message);
+      console.error(err);
+    }finally{
+      runBtn.disabled = false; runBtn.textContent = 'Run check';
+    }
+  });
+
+  async function processWorkbook(file){
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.worksheets[0];
+
+    // find header row: first row within first 5 that has a cell containing "subject"
+    let headerRowIdx = 1;
+    outer:
+    for(let r = 1; r <= Math.min(5, ws.rowCount); r++){
+      const row = ws.getRow(r);
+      for(let c = 1; c <= Math.min(10, row.cellCount || 10); c++){
+        const v = row.getCell(c).value;
+        if(v && String(v).toLowerCase().includes('subject')){
+          headerRowIdx = r;
+          break outer;
+        }
+      }
+    }
+    const headerRow = ws.getRow(headerRowIdx);
+    let colSubject = 1;
+    for(let c = 1; c <= 12; c++){
+      const v = headerRow.getCell(c).value;
+      if(v && String(v).toLowerCase().includes('subject')){ colSubject = c; break; }
+    }
+    const colPropA = colSubject + 1;
+    const colTarget = colSubject + 2;
+    const colPropB = colSubject + 3;
+    const colE = colSubject + 4;
+    const colF = colSubject + 5;
+    const colG = colSubject + 6;
+
+    rawRows = [];
+    ws.eachRow({ includeEmpty:false }, (row, rowNumber) => {
+      if(rowNumber <= headerRowIdx) return;
+      const subject = cellText(row.getCell(colSubject));
+      if(!subject) return;
+      rawRows.push({
+        rowNum: rowNumber,
+        subject,
+        propA: cellText(row.getCell(colPropA)),
+        target: cellText(row.getCell(colTarget)),
+        propB: cellText(row.getCell(colPropB)),
+        e: cellText(row.getCell(colE)),
+        f: cellText(row.getCell(colF)),
+        g: cellText(row.getCell(colG)),
+      });
+    });
+
+    headerInfo = { sheetName: ws.name, headerRowIdx, colSubject, colPropA, colTarget, colPropB, colE, colF, colG };
+
+    results = rawRows.map(r => {
+      const chk = checkRow(r.subject, r.propA, r.target, r.propB);
+      return Object.assign({}, r, { ok: chk.ok, basis: chk.basis });
+    });
+
+    renderStats();
+    renderTable();
+  }
+
+  function cellText(cell){
+    if(!cell) return '';
+    let v = cell.value;
+    if(v === null || v === undefined) return '';
+    if(typeof v === 'object'){
+      if(v.richText) return v.richText.map(t => t.text).join('');
+      if(v.text) return v.text;
+      if(v.result !== undefined) return String(v.result);
+      return String(v);
+    }
+    return String(v);
+  }
+
+  function renderStats(){
+    const total = results.length;
+    const green = results.filter(r => r.ok).length;
+    const yellow = total - green;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statGreen').textContent = green;
+    document.getElementById('statYellow').textContent = yellow;
+    document.getElementById('statRate').textContent = total ? Math.round(green/total*100) + '%' : '0%';
+  }
+
+  function renderTable(){
+    const q = searchBox.value.trim().toLowerCase();
+    resultBody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    let shown = 0;
+    results.forEach((r, i) => {
+      if(currentFilter === 'green' && !r.ok) return;
+      if(currentFilter === 'yellow' && r.ok) return;
+      if(q){
+        const hay = (r.subject + ' ' + r.propA + ' ' + r.target + ' ' + r.propB).toLowerCase();
+        if(!hay.includes(q)) return;
+      }
+      shown++;
+      const tr = document.createElement('tr');
+      tr.className = r.ok ? 'row-green' : 'row-yellow';
+      tr.innerHTML = `
+        <td class="idx">${r.rowNum}</td>
+        <td>${escapeHtml(r.subject)}</td>
+        <td>${escapeHtml(r.propA)}</td>
+        <td>${escapeHtml(r.target)}</td>
+        <td>${escapeHtml(r.propB)}</td>
+        <td class="status">${r.ok
+          ? '<span class="pill green"><span class="dot"></span>Match</span>'
+          : '<span class="pill yellow"><span class="dot"></span>Review</span>'}</td>
+        <td class="reason">${escapeHtml(r.basis)}</td>
+      `;
+      frag.appendChild(tr);
+    });
+    resultBody.appendChild(frag);
+    if(shown === 0){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="7"><div class="empty">No rows match this filter.</div></td>`;
+      resultBody.appendChild(tr);
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      renderTable();
+    });
+  });
+  searchBox.addEventListener('input', renderTable);
+
+  downloadBtn.addEventListener('click', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(headerInfo.sheetName || 'Bindings');
+
+    const headers = ['Subject (Reader)','Property','Target (Sender)','Property','Transfer Rate','Delta Filter','Retransmit','Binding Check','Match Basis'];
+    const headerRow = ws.addRow(headers);
+    headerRow.eachCell(cell => {
+      cell.font = { bold:true, color:{argb:'FFFFFFFF'} };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F2E28'} };
+    });
+
+    results.forEach(r => {
+      const row = ws.addRow([r.subject, r.propA, r.target, r.propB, r.e, r.f, r.g, r.ok ? 'Match' : 'Review', r.basis]);
+      const fill = r.ok ? 'FFD9F2E0' : 'FFFBF3C7';
+      const fontColor = r.ok ? 'FF1E6B3E' : 'FF8A7B0A';
+      row.getCell(8).fill = { type:'pattern', pattern:'solid', fgColor:{argb: fill} };
+      row.getCell(8).font = { bold:true, color:{argb: fontColor} };
+      row.getCell(9).font = { italic:true, color:{argb:'FF666666'}, size:10 };
+    });
+
+    ws.columns.forEach((col, idx) => {
+      const widths = [46,26,46,26,12,12,12,14,40];
+      col.width = widths[idx] || 20;
+    });
+    ws.views = [{ state:'frozen', ySplit:1 }];
+
+    const buf = await wb.xlsx.writeBuffer();
+    downloadBlob(new Blob([buf], {type:'application/octet-stream'}), 'binding_check_result.xlsx');
+  });
+
+  downloadCsvBtn.addEventListener('click', () => {
+    const headers = ['Subject (Reader)','Property','Target (Sender)','Property','Transfer Rate','Delta Filter','Retransmit','Binding Check','Match Basis'];
+    const lines = [headers.join(',')];
+    results.forEach(r => {
+      const row = [r.subject, r.propA, r.target, r.propB, r.e, r.f, r.g, r.ok?'Match':'Review', r.basis]
+        .map(v => `"${String(v||'').replace(/"/g,'""')}"`);
+      lines.push(row.join(','));
+    });
+    downloadBlob(new Blob([lines.join('\n')], {type:'text/csv'}), 'binding_check_result.csv');
+  });
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+})();
+</script>
+</body>
+</html>
